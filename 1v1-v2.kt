@@ -1,3 +1,8 @@
+typealias Choice = Int
+
+typealias Chance = Int
+
+
 data class State( 
     val player_health: Int = 50, 
     val enemy_health: Int = 50, 
@@ -8,20 +13,20 @@ data class State(
 
 class Player {
 
-    val state = State(50, 50, 3, false)
-
-
-    fun shouldTurnBeSkipped() = false
-
-
     fun skipTurn() { 
         println("Vous passez votre tour...")
     }
     
+
+    fun shouldTurnBeSkipped(state: State): State {
+        skipTurn()
+        return state.copy(skip_turn = false)
+    }
+
     
-    fun input(): Int { 
+    fun input(): Choice { 
         println("Souhaitez-vous attaquer (1) ou utiliser une potion (2)? ")
-        var choice: Int?
+        var choice: Choice?
         do {
             choice = readLine()?.toIntOrNull()
         } while (choice == null)
@@ -33,79 +38,96 @@ class Player {
     }
 
 
-    fun dodge() { 
+    fun dodge(): Chance { 
         val dodgeChance = (1..12).random()  
-        if (dodgeChance == 1) { 
-            dodged()
+        return dodgeChance
         }
-    } 
     
-    
-    fun attack(enemy_health: Int = variables.enemy_health) { 
+
+    fun attack(state: State): State { 
         val yourAttack = (5..10).random()
-        val  nEH = enemy_health - yourAttack
-        val newEnemyHealth = variables.copy(enemy_health = nEH)
+        val newEnemyHealth = state.enemy_health - yourAttack
+        val updatedEnemyHealth = state.copy(enemy_health = newEnemyHealth)
+        return updatedEnemyHealth 
+    }
+    
+    
+    fun potions(state: State): State {
+        val updatedNumberOfPotions = state.number_of_potions - 1
+        println("Il vous en reste $updatedNumberOfPotions.")
+        return state.copy(number_of_potions = updatedNumberOfPotions)
+    }
+
+
+    fun heal(state: State): State { 
+        val healing = (15..50).random() 
+        val playerHealed = state.player_health + healing
+        val updatedPlayerHealed = state.copy(player_health = playerHealed)
+        println("Vous vous êtes soigné de $healing points de vie ")
+        return updatedPlayerHealed
     } 
-    
-    
-    fun heal(number_of_potions: Int = variables.number_of_potions, player_health: Int = variables.player_health ,skip_turn: Boolean = variables.skip_turn) { 
-        if (number_of_potions > 0) { 
-            val heal = (15..50).random() 
-            val healed = player_health + heal
-            val playerHealed = variables.copy(healed) 
-            val number_of_potions = number_of_potions - 1
-            val skip_turn = true 
-        } 
-    } 
-    
-    
-    fun win(enemy_health: Int = variables.enemy_health) { 
-        if (enemy_health <= 0) { 
-            print("Vous avez gagné! ") 
-        } 
-    } 
+
+    fun returnSkipTurn(state: State): State {
+        val updatedSkipTurn = state.copy(skip_turn = true)
+        return updatedSkipTurn
+    }
+
+
+    fun win() { 
+        println("Vous avez gagné! ")
+    }
+
+
+    fun lose() {
+        println("Vous avez perdu... ")
+    }
 }
 
 
 class Enemy {
-
-    val variables = Variables(50, 50, 3, false)
 
     fun dodged() {
         println("Vous avez esquivé l'attaque ennemie! ")
     }
 
 
-    fun dodge() {
+    fun dodge(): Chance {
         val enemyDodgeChance = (1..8).random()
-        if (enemyDodgeChance == 1) {
-            dodged()
-        }
+        return enemyDodgeChance
     }
 
 
-    fun attack(player_health: Int = variables.player_health) {
+    fun attack(state: State): State {
         val enemyAttack = (5..15).random()
-        val nPH = player_health - enemyAttack
-        val newPlayerHealth = variables.copy(player_health = nPH)
+        val newPlayerHealth = state.player_health - enemyAttack
+        val updatedPlayerHealth = state.copy(player_health = newPlayerHealth)
+        return updatedPlayerHealth
     }
+}
 
 
-    fun lose(player_health: Int = variables.player_health) {
-        if (player_health <= 0) {
-            print("Vous avez perdu... ")
+class Display {
+
+    fun printInfos(state: State) {
+        println("Il vous reste ${state.player_health} points de vie. ")
+        println("Il reste ${state.enemy_health} points de vie à l'ennemi. ")
+        for (i in 1..50) {
+            print("=")
         }
+        println()
     }
 }
 
 
 class Game {
         
-    var jeuDuJoueur = Player()
-    var jeuEnnemi = Enemy()
+    val jeuDuJoueur = Player()
+    val jeuEnnemi = Enemy()
+    val affichage = Display()
+    var state = State()
 
 
-    fun print_rules() {
+    fun printRules() {
         println("""
         Voici les regles:
         - Vous et votre ennemi avez 50PV.  
@@ -118,19 +140,15 @@ class Game {
     }
 
 
-    //val rules = print_rules()
-    init {
+    fun start() {
 
-        /*fun toBoolean(s: String): Boolean {
-            return s.toBoolean()
-        }*/
-    
+        printRules()
 
         while (true) {
 
-            if (jeuDuJoueur.shouldTurnBeSkipped()) {
+            if (state.skip_turn) {
 
-                jeuDuJoueur.skipTurn()
+                state = jeuDuJoueur.shouldTurnBeSkipped(state)
             }
 
             else {
@@ -139,33 +157,57 @@ class Game {
 
                 if (userChoice == 1) {
 
-                    jeuDuJoueur.dodge()
+                    val dodgeChance = jeuDuJoueur.dodge()
 
-                    jeuDuJoueur.attack() 
+                    if (dodgeChance == 1) {
+
+                        jeuDuJoueur.dodged()
+                    }
+                    else {
+                        state = jeuDuJoueur.attack(state) 
+                    }
+
                 }
 
                 else if (userChoice == 2) {
+                    if (state.number_of_potions > 0) {
 
-                jeuDuJoueur.heal()
+                    state = jeuDuJoueur.potions(state)
+
+                    state = jeuDuJoueur.heal(state)
+
+                    state = jeuDuJoueur.returnSkipTurn(state)
+                    }
                 }
             }
 
-            jeuDuJoueur.win()
+            if (state.enemy_health <= 0) {
+                jeuDuJoueur.win()
+                break
+            }
 
             jeuEnnemi.dodge()
 
-            jeuEnnemi.attack()
+            val enemyDodgeChance = jeuEnnemi.dodge()
+            
+            if (enemyDodgeChance == 1) {
+                jeuEnnemi.dodged()
+            }
 
-            jeuEnnemi.lose()
-    
-        }        
+            else {
+                state = jeuEnnemi.attack(state)
+            }
+
+            affichage.printInfos(state)
+
+            if (state.player_health <= 0) {
+                jeuDuJoueur.lose()
+                break
+            }
+        }
     }
 }
 
-
 fun main() {
-
-    Variables(50, 50, 3, false)
-
-    Logic()
+    Game().start()
 }
