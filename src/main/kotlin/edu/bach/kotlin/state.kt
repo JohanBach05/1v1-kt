@@ -22,9 +22,9 @@ data class Config (
 )
 
 
-class ChanceGenerator {
+open class ChanceGenerator {
 
-    fun generate(range: IntRange): Chance {
-        return range.random().toInt()
+    open fun generate(range: IntRange): Chance {
+        return range.random()
     }
 } 
