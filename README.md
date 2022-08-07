@@ -12,3 +12,8 @@ This goal of this game is...
 ```
 java -jar build/libs/1v1-kt.jar
 ```
+### Run tests
+```
+./gradle test
+```
+
